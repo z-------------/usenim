@@ -73,7 +73,7 @@ use_version () {
     if [ -h nim ]; then
         dir_symlink "$(readlink nim)" .nim-prev
     fi
-    dir_symlink "$FOUND_VER" nim
+    dir_symlink "$1" nim
     nim --version
 }
 
@@ -190,7 +190,7 @@ else
 fi
 if [ -n "$FOUND_VER" ]; then
     # version found, symlink it
-    use_version
+    use_version "$FOUND_VER"
 else
     # version not found
     echo_err "Version $VER is not available."
@@ -201,8 +201,7 @@ else
     case "$answer" in
         [Yy]*)
             install_version "$VER"
-            FOUND_VER=nim-"$VER"
-            use_version
+            use_version nim-"$VER"
             ;;
         *)
             exit 1
