@@ -12,6 +12,13 @@ echo_err () {
     echo '' >&2
 }
 
+require_var () {
+    if [ -z "$1" ]; then
+        echo_err "No $2 given."
+        exit 1
+    fi
+}
+
 # list local versions
 print_available () {
     echo 'Available versions:' >&2
@@ -93,7 +100,9 @@ case "$VER" in
         ;;
     --link | -l)
         # symlink an existing directory
-        set -u
+        # TODO validate that the directory exists (and contains a Nim?)
+        require_var "$1" 'version name'
+        require_var "$2" directory
         VER="$1"
         pushd "$ORIG_CWD" > /dev/null
         DIR=$(realpath "$2")
@@ -104,7 +113,7 @@ case "$VER" in
         ;;
     --remove | -r)
         # remove an existing version or link
-        set -u
+        require_var "$1" version
         VER="$1"
         read -r -p "Remove version $VER? [y/N] " answer
         case "$answer" in
@@ -118,7 +127,7 @@ case "$VER" in
         ;;
     --which | -w)
         # print the real path of a file in the current .nim/bin
-        set -u
+        require_var "$1" filename
         FILE="$1"
         FILEPATH="nim/bin/$FILE"
         if [ -x "$FILEPATH" ]; then
