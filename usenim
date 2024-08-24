@@ -41,10 +41,21 @@ print_available () {
 
 # clone and install a given version
 install_version () {
-    set -x
-
-    git clone 'https://github.com/nim-lang/Nim' --depth 1 --branch v"$VER" nim-"$VER"
-    pushd nim-"$VER"
+    GIT_URL='https://github.com/nim-lang/Nim'
+    if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        set -x
+        git clone "$GIT_URL" --depth 1 --branch v"$1" nim-"$1"
+        pushd nim-"$1"
+    elif [[ "$1" =~ ^#[0-9A-Za-z]+$ ]]; then
+        set -x
+        git clone "$GIT_URL" nim-"$1"
+        pushd nim-"$1"
+        git checkout "${1:1}" # omit leading '#'
+    else
+        set -x
+        git clone "$GIT_URL" --depth 1 --branch "$1" nim-"$1"
+        pushd nim-"$1"
+    fi
     ./build_all.sh
     rm -rf nimcache/ csources*/
     find . -name .git -exec rm -rf {} +
@@ -189,7 +200,7 @@ else
     read -r -p 'Do you want to clone and install it? [y/N] ' answer
     case "$answer" in
         [Yy]*)
-            install_version
+            install_version "$VER"
             FOUND_VER=nim-"$VER"
             use_version
             ;;
