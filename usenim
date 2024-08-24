@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+# helper functions
+
+# print to stderr in red
+echo_err () {
+    tput setaf 1 >&2
+    echo -n "$@" >&2
+    tput sgr0 >&2
+    echo '' >&2
+}
+
+# list local versions
+print_available () {
+    echo 'Available versions:' >&2
+    local ALL_VERS; ALL_VERS=$(printf '%s\n' nim-* | sort -V)
+    local CUR_VER; CUR_VER=$(readlink nim || echo '')
+    for f in $ALL_VERS; do
+        if [ -d "$f" ]; then
+            if [[ "$f" == "$CUR_VER" ]]; then
+                echo -n '* ' >&2
+                tput setaf 2 >&2
+            else
+                echo -n '  ' >&2
+            fi
+            echo -n "${f//nim-/}" >&2
+            tput sgr0 >&2
+            LINK_DEST=$(readlink "$f" || true)
+            if [ -n "$LINK_DEST" ]; then
+                tput dim >&2
+                echo -n ' -> ' >&2
+                tput sgr0 >&2
+                echo -n "$LINK_DEST" >&2
+            fi
+            echo '' >&2
+        fi
+    done
+}
+
+# clone and install a given version
+install_version () {
+    set -x
+
+    git clone 'https://github.com/nim-lang/Nim' --depth 1 --branch v"$VER" nim-"$VER"
+    pushd nim-"$VER"
+    ./build_all.sh
+    rm -rf nimcache/ csources*/
+    find . -name .git -exec rm -rf {} +
+    popd
+
+    { set +x; } 2> /dev/null
+}
+
+dir_symlink () {
+    ln -sTf "$1" "$2"
+}
+
+# symlink a local version for use
+use_version () {
+    if [ -h nim ]; then
+        dir_symlink "$(readlink nim)" .nim-prev
+    fi
+    dir_symlink "$FOUND_VER" nim
+    nim --version
+}
+
+# main
+
+ORIG_CWD=$(pwd)
+cd ~/.nim
+
+VER="$1"
+shift || true
+case "$VER" in
+    --stable)
+        # ask Nim server for the latest stable version
+        declare -r URL='https://nim-lang.org/channels/stable'
+        echo "Querying latest stable version from $URL..." >&2
+        VER=$(curl -sS "$URL")
+        ;;
+    --link | -l)
+        # symlink an existing directory
+        set -u
+        VER="$1"
+        pushd "$ORIG_CWD" > /dev/null
+        DIR=$(realpath "$2")
+        popd > /dev/null
+        dir_symlink "$DIR" nim-"$VER"
+        print_available
+        exit
+        ;;
+    --remove | -r)
+        # remove an existing version or link
+        set -u
+        VER="$1"
+        read -r -p "Remove version $VER? [y/N] " answer
+        case "$answer" in
+            [Yy]*)
+                rm -r nim-"$VER"
+                print_available
+                exit
+                ;;
+        esac
+        exit 1
+        ;;
+    --which | -w)
+        # print the real path of a file in the current .nim/bin
+        set -u
+        FILE="$1"
+        FILEPATH="nim/bin/$FILE"
+        if [ -x "$FILEPATH" ]; then
+            realpath "$FILEPATH"
+            exit
+        else
+            echo_err "$FILE does not exist."
+            exit 1
+        fi
+        ;;
+    --help | -h)
+        cat << EOD >&2
+Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | (-r | --remove) <version> | (-h | --help)]
+
+Examples:
+
+  List available versions:
+  $ usenim
+
+  Use a specific version:
+  $ usenim 2.0.8
+
+  Query and use the latest stable version:
+  $ usenim --stable
+
+  Go back to the previous version:
+  $ usenim -
+
+  Link an existing directory:
+  $ usenim -l devel ~/programming/Nim
+
+  Remove a version:
+  $ usenim -r 1.6.20
+
+  Show the real path of an executable in the current version:
+  $ usenim --which nimsuggest
+EOD
+        exit 1
+        ;;
+    -)
+        ;;
+    -*)
+        echo_err "Unknown option '$VER'."
+        exit 1
+        ;;
+    '')
+        # list local versions and quit
+        echo_err 'No version specified.'
+        print_available
+        exit 1
+        ;;
+esac
+
+# look for matching local version
+FOUND_VER=''
+if [ "$VER" = - ]; then
+    if ! [ -h .nim-prev ]; then
+        echo_err 'There is no previous version to use.'
+        exit 1
+    fi
+    FOUND_VER=$(readlink .nim-prev)
+else
+    MATCHING_VERS=$(printf '%s\n' nim-"$VER"* | sort -V)
+    for f in $MATCHING_VERS; do
+        if [ -d "$f" ]; then
+            FOUND_VER="$f"
+        fi
+    done
+fi
+if [ -n "$FOUND_VER" ]; then
+    # version found, symlink it
+    use_version
+else
+    # version not found
+    echo_err "Version $VER is not available."
+    print_available
+
+    # ask if the user wants to install it
+    read -r -p 'Do you want to clone and install it? [y/N] ' answer
+    case "$answer" in
+        [Yy]*)
+            install_version
+            FOUND_VER=nim-"$VER"
+            use_version
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+fi
