@@ -140,7 +140,7 @@ case "$VER" in
         ;;
     --help | -h)
         cat << EOD >&2
-Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | (-r | --remove) <version> | (-h | --help)]
+Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help)]
 
 Examples:
 
