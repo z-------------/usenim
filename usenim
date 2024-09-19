@@ -175,9 +175,8 @@ EOD
         ;;
     '')
         # list local versions and quit
-        echo_err 'No version specified.'
         print_available
-        exit 1
+        exit
         ;;
 esac
 
