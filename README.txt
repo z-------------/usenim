@@ -6,13 +6,13 @@ Examples:
   $ usenim
 
   Use a specific version:
-  $ usenim 2.0.8
-
-  Query and use the latest stable version:
-  $ usenim --stable
+  $ usenim 2.2.0
 
   Go back to the previous version:
   $ usenim -
+
+  Query and use the latest stable version:
+  $ usenim --stable
 
   Link an existing directory:
   $ usenim -l devel ~/programming/Nim
