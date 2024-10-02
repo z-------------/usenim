@@ -21,7 +21,7 @@ require_var () {
 
 # list local versions
 print_available () {
-    echo 'Available versions:' >&2
+    echo 'Installed versions:' >&2
     local ALL_VERS; ALL_VERS=$(printf '%s\n' nim-* | sort -V)
     local CUR_VER; CUR_VER=$(readlink nim || echo '')
     for f in $ALL_VERS; do
@@ -144,7 +144,7 @@ Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | 
 
 Examples:
 
-  List available versions:
+  List installed versions:
   $ usenim
 
   Use a specific version:
@@ -201,7 +201,7 @@ if [ -n "$FOUND_VER" ]; then
     use_version "$FOUND_VER"
 else
     # version not found
-    echo_err "Version $VER is not available."
+    echo_err "Version $VER is not installed."
     print_available
 
     # ask if the user wants to install it

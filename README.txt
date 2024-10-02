@@ -2,7 +2,7 @@ Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | 
 
 Examples:
 
-  List available versions:
+  List installed versions:
   $ usenim
 
   Use a specific version:
