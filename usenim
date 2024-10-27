@@ -80,7 +80,10 @@ dir_symlink () {
 # symlink a local version for use
 use_version () {
     if [ -h nim ]; then
-        dir_symlink "$(readlink nim)" "$PREV_FILENAME"
+        PREV_TARGET=$(readlink nim)
+        if [ "$PREV_TARGET" != "$1" ]; then
+            dir_symlink "$PREV_TARGET" "$PREV_FILENAME"
+        fi
     fi
     dir_symlink "$1" nim
     nim --version
