@@ -2,6 +2,8 @@
 
 set -eo pipefail
 
+declare -r PREV_FILENAME=.nim-prev
+
 # helper functions
 
 # print to stderr in red
@@ -78,7 +80,7 @@ dir_symlink () {
 # symlink a local version for use
 use_version () {
     if [ -h nim ]; then
-        dir_symlink "$(readlink nim)" .nim-prev
+        dir_symlink "$(readlink nim)" "$PREV_FILENAME"
     fi
     dir_symlink "$1" nim
     nim --version
@@ -188,11 +190,11 @@ set -u
 # look for matching local version
 FOUND_VER=''
 if [ "$VER" = - ]; then
-    if ! [ -h .nim-prev ]; then
+    if ! [ -h "$PREV_FILENAME" ]; then
         echo_err 'There is no previous version to use.'
         exit 1
     fi
-    FOUND_VER=$(readlink .nim-prev)
+    FOUND_VER=$(readlink "$PREV_FILENAME")
 else
     MATCHING_VERS=$(printf '%s\n' nim-"$VER"* | sort -V)
     for f in $MATCHING_VERS; do
