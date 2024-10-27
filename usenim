@@ -89,9 +89,7 @@ use_version () {
 ORIG_CWD=$(pwd)
 cd ~/.nim
 
-VER="$1"
-shift || true
-case "$VER" in
+case "$1" in
     --stable)
         # ask Nim server for the latest stable version
         declare -r URL='https://nim-lang.org/channels/stable'
@@ -101,11 +99,11 @@ case "$VER" in
     --link | -l)
         # symlink an existing directory
         # TODO validate that the directory exists (and contains a Nim?)
-        require_var "$1" 'version name'
-        require_var "$2" directory
-        VER="$1"
+        require_var "$2" 'version name'
+        require_var "$3" directory
+        VER="$2"
         pushd "$ORIG_CWD" > /dev/null
-        DIR=$(realpath "$2")
+        DIR=$(realpath "$3")
         popd > /dev/null
         dir_symlink "$DIR" nim-"$VER"
         print_available
@@ -113,8 +111,8 @@ case "$VER" in
         ;;
     --remove | -r)
         # remove an existing version or link
-        require_var "$1" version
-        VER="$1"
+        require_var "$2" version
+        VER="$2"
         read -r -p "Remove version $VER? [y/N] " answer
         case "$answer" in
             [Yy]*)
@@ -127,8 +125,8 @@ case "$VER" in
         ;;
     --which | -w)
         # print the real path of a file in the current .nim/bin
-        require_var "$1" filename
-        FILE="$1"
+        require_var "$2" filename
+        FILE="$2"
         FILEPATH="nim/bin/$FILE"
         if [ -x "$FILEPATH" ]; then
             realpath "$FILEPATH"
@@ -168,9 +166,10 @@ EOD
         exit 1
         ;;
     -)
+        VER="$1"
         ;;
     -*)
-        echo_err "Unknown option '$VER'."
+        echo_err "Unknown option '$1'."
         exit 1
         ;;
     '')
@@ -178,7 +177,13 @@ EOD
         print_available
         exit
         ;;
+    *)
+        # version specified
+        VER="$1"
+        ;;
 esac
+
+set -u
 
 # look for matching local version
 FOUND_VER=''
