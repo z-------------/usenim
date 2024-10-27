@@ -3,6 +3,7 @@
 set -eo pipefail
 
 declare -r PREV_FILENAME=.nim-prev
+HAS_CMDLINE=''
 
 # helper functions
 
@@ -77,16 +78,47 @@ dir_symlink () {
     ln -sTf "$1" "$2"
 }
 
-# symlink a local version for use
+# use a locally installed version
 use_version () {
-    if [ -h nim ]; then
-        PREV_TARGET=$(readlink nim)
-        if [ "$PREV_TARGET" != "$1" ]; then
-            dir_symlink "$PREV_TARGET" "$PREV_FILENAME"
+    if [ -n "$HAS_CMDLINE" ]; then
+        # command given via -x, temporarily set PATH and run command
+        REALPATH=$(realpath "$1")
+        cd "$ORIG_CWD"
+        export PATH="$REALPATH/bin:$PATH"
+        "${CMDLINE[@]}"
+        exit "$?"
+    else
+        # update symlink
+        if [ -h nim ]; then
+            PREV_TARGET=$(readlink nim)
+            if [ "$PREV_TARGET" != "$1" ]; then
+                dir_symlink "$PREV_TARGET" "$PREV_FILENAME"
+            fi
         fi
+        dir_symlink "$1" nim
+        nim --version
     fi
-    dir_symlink "$1" nim
-    nim --version
+}
+
+prepare_cmdline () {
+    case "$1" in
+        -x)
+            shift || true
+            if [ "$#" -lt 1 ]; then
+                echo_err 'No command specified'
+                exit 1
+            fi
+            HAS_CMDLINE=1
+            CMDLINE=("$@")
+            ;;
+        '')
+            # no command, ok
+            ;;
+        *)
+            echo_err 'Unexpected argument'
+            exit 1
+            ;;
+    esac
 }
 
 # main
@@ -100,6 +132,8 @@ case "$1" in
         declare -r URL='https://nim-lang.org/channels/stable'
         echo "Querying latest stable version from $URL..." >&2
         VER=$(curl -sS "$URL")
+        shift || true
+        prepare_cmdline "$@"
         ;;
     --link | -l)
         # symlink an existing directory
@@ -143,7 +177,11 @@ case "$1" in
         ;;
     --help | -h)
         cat << EOD >&2
-Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help)]
+Usage:
+
+    usenim
+    usenim (<version> | - | --stable) [-x <cmdline>...]
+    usenim ((-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help))
 
 Examples:
 
@@ -159,6 +197,9 @@ Examples:
   Query and use the latest stable version:
   $ usenim --stable
 
+  Run a command using a specific version:
+  $ usenim 2.2.0 -x bash
+
   Link an existing directory:
   $ usenim -l devel ~/programming/Nim
 
@@ -172,6 +213,8 @@ EOD
         ;;
     -)
         VER="$1"
+        shift || true
+        prepare_cmdline "$@"
         ;;
     -*)
         echo_err "Unknown option '$1'."
@@ -185,6 +228,8 @@ EOD
     *)
         # version specified
         VER="$1"
+        shift || true
+        prepare_cmdline "$@"
         ;;
 esac
 
