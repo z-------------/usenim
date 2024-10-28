@@ -1,4 +1,8 @@
-Usage: usenim [<version> | - | --stable | (-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help)]
+Usage:
+
+    usenim
+    usenim (<version> | - | --stable) [-x <cmdline>...]
+    usenim ((-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help))
 
 Examples:
 
@@ -13,6 +17,9 @@ Examples:
 
   Query and use the latest stable version:
   $ usenim --stable
+
+  Run a command using a specific version:
+  $ usenim 2.2.0 -x bash
 
   Link an existing directory:
   $ usenim -l devel ~/programming/Nim
