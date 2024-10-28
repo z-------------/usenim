@@ -1,8 +1,8 @@
 Usage:
 
-    usenim
-    usenim (<version> | - | --stable) [-x <cmdline>...]
-    usenim ((-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help))
+  usenim
+  usenim (<version> | - | --stable) [-x <cmdline>...]
+  usenim ((-l | --link) <version> <directory> | (-r | --remove) <version> | (-w | --which) <filename> | (-h | --help))
 
 Examples:
 
