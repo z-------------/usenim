@@ -105,7 +105,7 @@ prepare_cmdline () {
         -x)
             shift || true
             if [ "$#" -lt 1 ]; then
-                echo_err 'No command specified'
+                echo_err 'No command specified.'
                 exit 1
             fi
             HAS_CMDLINE=1
@@ -115,7 +115,7 @@ prepare_cmdline () {
             # no command, ok
             ;;
         *)
-            echo_err 'Unexpected argument'
+            echo_err 'Unexpected argument.'
             exit 1
             ;;
     esac
