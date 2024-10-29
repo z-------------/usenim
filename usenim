@@ -129,11 +129,11 @@ cd ~/.nim
 case "$1" in
     --stable)
         # ask Nim server for the latest stable version
+        shift || true
+        prepare_cmdline "$@"
         declare -r URL='https://nim-lang.org/channels/stable'
         echo "Querying latest stable version from $URL..." >&2
         VER=$(curl -sS "$URL")
-        shift || true
-        prepare_cmdline "$@"
         ;;
     --link | -l)
         # symlink an existing directory
