@@ -188,17 +188,21 @@ case "$1" in
         ;;
     --which | -w)
         # print the real path of a file in the current .nim/bin
-        require_var "$2" filename
-        expect_arg_count 2 "$#"
-        FILE="$2"
-        FILEPATH="nim/bin/$FILE"
-        if [ -x "$FILEPATH" ]; then
-            realpath "$FILEPATH"
-            exit
-        else
-            echo_err "$FILE does not exist."
-            exit 1
-        fi
+        shift || true
+        require_var "$1" filename
+        RET=0
+        while [ "$#" -gt 0 ]; do
+            FILE="$1"
+            FILEPATH="nim/bin/$FILE"
+            if [ -x "$FILEPATH" ]; then
+                realpath "$FILEPATH"
+            else
+                echo_err "$FILE does not exist."
+                RET=1
+            fi
+            shift || true
+        done
+        exit "$RET"
         ;;
     --help | -h)
         expect_arg_count 1 "$#"
@@ -207,7 +211,7 @@ Usage:
 
   usenim
   usenim (<version> | - | --stable) [-x <cmdline>...]
-  usenim ((-l | --link) <version> <directory> | (-r | --remove) <version>... | (-w | --which) <filename> | (-h | --help))
+  usenim ((-l | --link) <version> <directory> | (-r | --remove) <version>... | (-w | --which) <filename>... | (-h | --help))
 
 Examples:
 
