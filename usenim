@@ -151,7 +151,6 @@ case "$1" in
         ;;
     --link | -l)
         # symlink an existing directory
-        # TODO validate that the directory exists (and contains a Nim?)
         require_var "$2" version
         require_var "$3" directory
         expect_arg_count 3 "$#"
@@ -159,9 +158,14 @@ case "$1" in
         pushd "$ORIG_CWD" > /dev/null
         DIR=$(realpath "$3")
         popd > /dev/null
-        dir_symlink "$DIR" nim-"$VER"
-        print_available
-        exit
+        if [ -x "$DIR"/bin/nim ]; then
+            dir_symlink "$DIR" nim-"$VER"
+            print_available
+            exit
+        else
+            echo_err "$DIR does not contain a Nim installation."
+            exit 1
+        fi
         ;;
     --remove | -r)
         # remove an existing version or link
