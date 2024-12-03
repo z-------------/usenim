@@ -6,6 +6,10 @@ shopt -s nullglob
 declare -r PREV_FILENAME=.nim-prev
 HAS_CMDLINE=''
 
+if [ -z "$NIM_DIR" ]; then
+    NIM_DIR="$HOME/.nim"
+fi
+
 # helper functions
 
 # print to stderr in red
@@ -140,7 +144,7 @@ prepare_cmdline () {
 # main
 
 ORIG_CWD=$(pwd)
-cd ~/.nim
+cd "$NIM_DIR"
 
 case "$1" in
     --stable)
