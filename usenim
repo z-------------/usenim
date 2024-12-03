@@ -144,6 +144,7 @@ prepare_cmdline () {
 # main
 
 ORIG_CWD=$(pwd)
+mkdir -pv "$NIM_DIR"
 cd "$NIM_DIR"
 
 case "$1" in
