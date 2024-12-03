@@ -81,9 +81,10 @@ install_version () {
         pushd nim-"$1"
     fi
     ./build_all.sh
-    # delete unneeded directories to save space
+    # delete unneeded stuff to save space
     rm -rf nimcache/ csources*/
     find . -name .git -exec rm -rf {} +
+    rm -v compiler/nim{1,2} || true
     popd
 
     { set +x; } 2> /dev/null
