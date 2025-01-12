@@ -2,7 +2,10 @@ Usage:
 
   usenim
   usenim (<version> | - | --stable) [-x <cmdline>...]
-  usenim ((-l | --link) <version> <directory> | (-r | --remove) <version>... | (-w | --which) <filename>... | (-h | --help))
+  usenim (-l | --link) <version> <directory>
+  usenim (-r | --remove) <version>...
+  usenim (-w | --which) <filename>...
+  usenim (-h | --help)
 
 Examples:
 
