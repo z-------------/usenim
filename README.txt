@@ -14,6 +14,8 @@ Examples:
 
   Use a specific version:
   $ usenim 2.2.0
+  $ usenim '#78983f1876726a49c69d65629ab433ea1310ece1'
+  $ usenim version-2-0
 
   Go back to the previous version:
   $ usenim -
@@ -23,6 +25,7 @@ Examples:
 
   Run a command using a specific version:
   $ usenim 2.2.0 -x bash
+  $ usenim 2.2.0 -x nim c prog
 
   Link an existing directory:
   $ usenim -l devel ~/programming/Nim
