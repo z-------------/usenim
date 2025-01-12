@@ -6,11 +6,16 @@
 set -eo pipefail
 shopt -s nullglob
 
-declare -r PREV_FILENAME=.nim-prev
+declare -r PREV_FILENAME=prev
+declare -r CUR_FILENAME=current
 HAS_CMDLINE=''
 
 if [ -z "$NIM_DIR" ]; then
-    NIM_DIR="$HOME/.nim"
+    if [ -z "$XDG_DATA_HOME" ]; then
+        NIM_DIR="$HOME/.local/share/usenim"
+    else
+        NIM_DIR="$XDG_DATA_HOME/usenim"
+    fi
 fi
 
 # helper functions
@@ -44,7 +49,7 @@ expect_arg_count () {
 print_available () {
     echo 'Installed versions:' >&2
     local ALL_VERS; ALL_VERS=$(printf '%s\n' nim-* | sort -V)
-    local CUR_VER; CUR_VER=$(readlink nim || echo '')
+    local CUR_VER; CUR_VER=$(readlink "$CUR_FILENAME" || echo '')
     for f in $ALL_VERS; do
         if [ -d "$f" ]; then
             if [[ "$f" == "$CUR_VER" ]]; then
@@ -112,13 +117,13 @@ use_version () {
         exit "$?"
     else
         # update symlink
-        if [ -h nim ]; then
-            PREV_TARGET=$(readlink nim)
+        if [ -h "$CUR_FILENAME" ]; then
+            PREV_TARGET=$(readlink "$CUR_FILENAME")
             if [ "$PREV_TARGET" != "$1" ]; then
                 dir_symlink "$PREV_TARGET" "$PREV_FILENAME"
             fi
         fi
-        dir_symlink "$1" nim
+        dir_symlink "$1" "$CUR_FILENAME"
         nim --version
     fi
 }
@@ -201,13 +206,13 @@ case "$1" in
         fi
         ;;
     --which | -w)
-        # print the real path of a file in the current .nim/bin
+        # print the real path of a file in the current version's bin
         shift || true
         require_var "$1" filename
         RET=0
         while [ "$#" -gt 0 ]; do
             FILE="$1"
-            FILEPATH="nim/bin/$FILE"
+            FILEPATH="$CUR_FILENAME/bin/$FILE"
             if [ -x "$FILEPATH" ]; then
                 realpath "$FILEPATH"
             else
