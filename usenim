@@ -29,17 +29,21 @@ echo_err () {
 }
 
 require_var () {
-    if [ -z "$1" ]; then
-        echo_err "No $2 given."
+    local VALUE="$1"
+    local LABEL="$2"
+    if [ -z "$VALUE" ]; then
+        echo_err "No $LABEL given."
         exit 1
     fi
 }
 
 expect_arg_count () {
-    if [ "$2" -lt "$1" ]; then
+    local EXPECTED="$1"
+    local ACTUAL="$2"
+    if [ "$ACTUAL" -lt "$EXPECTED" ]; then
         echo_err "Too few arguments."
         exit 1
-    elif [ "$2" -gt "$1" ]; then
+    elif [ "$ACTUAL" -gt "$EXPECTED" ]; then
         echo_err "Too many arguments."
         exit 1
     fi
@@ -74,23 +78,24 @@ print_available () {
 
 # clone and install a given version
 install_version () {
+    local VER="$1"
     GIT_URL='https://github.com/nim-lang/Nim'
-    if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    if [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         # e.g. 2.0.10
         set -x
-        git clone "$GIT_URL" --depth 1 --branch v"$1" nim-"$1"
-        pushd nim-"$1"
-    elif [[ "$1" =~ ^#[0-9A-Za-z]+$ ]]; then
+        git clone "$GIT_URL" --depth 1 --branch v"$VER" nim-"$VER"
+        pushd nim-"$VER"
+    elif [[ "$VER" =~ ^#[0-9A-Za-z]+$ ]]; then
         # e.g. #15271dba2f4772a193f027d36c05b838dfff5bd4
         set -x
-        git clone "$GIT_URL" nim-"$1"
-        pushd nim-"$1"
+        git clone "$GIT_URL" nim-"$VER"
+        pushd nim-"$VER"
         git checkout "${1:1}" # omit leading '#'
     else
         # arbitrary branch/tag
         set -x
-        git clone "$GIT_URL" --depth 1 --branch "$1" nim-"$1"
-        pushd nim-"$1"
+        git clone "$GIT_URL" --depth 1 --branch "$VER" nim-"$VER"
+        pushd nim-"$VER"
     fi
     ./build_all.sh
     # delete unneeded stuff to save space
@@ -103,14 +108,17 @@ install_version () {
 }
 
 dir_symlink () {
-    ln -sTf "$1" "$2"
+    local TARGET="$1"
+    local FILENAME="$2"
+    ln -sTf "$TARGET" "$FILENAME"
 }
 
 # use a locally installed version
 use_version () {
+    local NIM_DIR="$1"
     if [ -n "$HAS_CMDLINE" ]; then
         # command given via -x, temporarily set PATH and run command
-        REALPATH=$(realpath "$1")
+        REALPATH=$(realpath "$NIM_DIR")
         cd "$ORIG_CWD"
         export PATH="$REALPATH/bin:$PATH"
         "${CMDLINE[@]}"
@@ -119,11 +127,11 @@ use_version () {
         # update symlink
         if [ -h "$CUR_FILENAME" ]; then
             PREV_TARGET=$(readlink "$CUR_FILENAME")
-            if [ "$PREV_TARGET" != "$1" ]; then
+            if [ "$PREV_TARGET" != "$NIM_DIR" ]; then
                 dir_symlink "$PREV_TARGET" "$PREV_FILENAME"
             fi
         fi
-        dir_symlink "$1" "$CUR_FILENAME"
+        dir_symlink "$NIM_DIR" "$CUR_FILENAME"
         nim --version
     fi
 }
