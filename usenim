@@ -8,7 +8,6 @@ shopt -s nullglob
 
 declare -r PREV_FILENAME=prev
 declare -r CUR_FILENAME=current
-HAS_CMDLINE=''
 
 if [ -z "$NIM_DIR" ]; then
     if [ -z "$XDG_DATA_HOME" ]; then
@@ -18,222 +17,12 @@ if [ -z "$NIM_DIR" ]; then
     fi
 fi
 
-# helper functions
+set -u
 
-# print to stderr in red
-echo_err () {
-    tput setaf 1 >&2
-    echo -n "$@" >&2
-    tput sgr0 >&2
-    echo '' >&2
-}
+# commands
 
-require_var () {
-    local VALUE="$1"
-    local LABEL="$2"
-    if [ -z "$VALUE" ]; then
-        echo_err "No $LABEL given."
-        exit 1
-    fi
-}
-
-expect_arg_count () {
-    local EXPECTED="$1"
-    local ACTUAL="$2"
-    if [ "$ACTUAL" -lt "$EXPECTED" ]; then
-        echo_err "Too few arguments."
-        exit 1
-    elif [ "$ACTUAL" -gt "$EXPECTED" ]; then
-        echo_err "Too many arguments."
-        exit 1
-    fi
-}
-
-# list local versions
-print_available () {
-    echo 'Installed versions:' >&2
-    local ALL_VERS; ALL_VERS=$(printf '%s\n' nim-* | sort -V)
-    local CUR_VER; CUR_VER=$(readlink "$CUR_FILENAME" || echo '')
-    for f in $ALL_VERS; do
-        if [ -d "$f" ]; then
-            if [[ "$f" == "$CUR_VER" ]]; then
-                echo -n '* ' >&2
-                tput setaf 2 >&2
-            else
-                echo -n '  ' >&2
-            fi
-            echo -n "${f//nim-/}" >&2
-            tput sgr0 >&2
-            LINK_DEST=$(readlink "$f" || true)
-            if [ -n "$LINK_DEST" ]; then
-                tput dim >&2
-                echo -n ' -> ' >&2
-                tput sgr0 >&2
-                echo -n "$LINK_DEST" >&2
-            fi
-            echo '' >&2
-        fi
-    done
-}
-
-# clone and install a given version
-install_version () {
-    local VER="$1"
-    GIT_URL='https://github.com/nim-lang/Nim'
-    if [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        # e.g. 2.0.10
-        set -x
-        git clone "$GIT_URL" --depth 1 --branch v"$VER" nim-"$VER"
-        pushd nim-"$VER"
-    elif [[ "$VER" =~ ^#[0-9A-Za-z]+$ ]]; then
-        # e.g. #15271dba2f4772a193f027d36c05b838dfff5bd4
-        set -x
-        git clone "$GIT_URL" nim-"$VER"
-        pushd nim-"$VER"
-        git checkout "${1:1}" # omit leading '#'
-    else
-        # arbitrary branch/tag
-        set -x
-        git clone "$GIT_URL" --depth 1 --branch "$VER" nim-"$VER"
-        pushd nim-"$VER"
-    fi
-    ./build_all.sh
-    # delete unneeded stuff to save space
-    rm -rf nimcache/ csources*/
-    find . -name .git -exec rm -rf {} +
-    rm -v compiler/nim{1,2} || true
-    popd
-
-    { set +x; } 2> /dev/null
-}
-
-dir_symlink () {
-    local TARGET="$1"
-    local FILENAME="$2"
-    ln -sTf "$TARGET" "$FILENAME"
-}
-
-# use a locally installed version
-use_version () {
-    local NIM_DIR="$1"
-    if [ -n "$HAS_CMDLINE" ]; then
-        # command given via -x, temporarily set PATH and run command
-        REALPATH=$(realpath "$NIM_DIR")
-        cd "$ORIG_CWD"
-        export PATH="$REALPATH/bin:$PATH"
-        "${CMDLINE[@]}"
-        exit "$?"
-    else
-        # update symlink
-        if [ -h "$CUR_FILENAME" ]; then
-            PREV_TARGET=$(readlink "$CUR_FILENAME")
-            if [ "$PREV_TARGET" != "$NIM_DIR" ]; then
-                dir_symlink "$PREV_TARGET" "$PREV_FILENAME"
-            fi
-        fi
-        dir_symlink "$NIM_DIR" "$CUR_FILENAME"
-        nim --version
-    fi
-}
-
-prepare_cmdline () {
-    case "$1" in
-        -x)
-            shift || true
-            if [ "$#" -lt 1 ]; then
-                echo_err 'No command specified.'
-                exit 1
-            fi
-            HAS_CMDLINE=1
-            CMDLINE=("$@")
-            ;;
-        '')
-            # no command, ok
-            ;;
-        *)
-            echo_err 'Unexpected argument.'
-            exit 1
-            ;;
-    esac
-}
-
-# main
-
-ORIG_CWD=$(pwd)
-mkdir -pv "$NIM_DIR"
-cd "$NIM_DIR"
-
-case "$1" in
-    --stable)
-        # ask Nim server for the latest stable version
-        shift || true
-        prepare_cmdline "$@"
-        declare -r URL='https://nim-lang.org/channels/stable'
-        echo "Querying latest stable version from $URL..." >&2
-        VER=$(curl -sS "$URL")
-        ;;
-    --link | -l)
-        # symlink an existing directory
-        require_var "$2" version
-        require_var "$3" directory
-        expect_arg_count 3 "$#"
-        VER="$2"
-        pushd "$ORIG_CWD" > /dev/null
-        DIR=$(realpath "$3")
-        popd > /dev/null
-        if [ -x "$DIR"/bin/nim ]; then
-            dir_symlink "$DIR" nim-"$VER"
-            print_available
-            exit
-        else
-            echo_err "$DIR does not contain a Nim installation."
-            exit 1
-        fi
-        ;;
-    --remove | -r)
-        # remove an existing version or link
-        shift || true
-        require_var "$1" version
-        DID_DELETE=''
-        while [ "$#" -gt 0 ]; do
-            VER="$1"
-            read -r -p "Remove version $VER? [y/N] " answer
-            case "$answer" in
-                [Yy]*)
-                    DID_DELETE=1
-                    rm -r nim-"$VER"
-                    ;;
-            esac
-            shift || true
-        done
-        if [ -n "$DID_DELETE" ]; then
-            print_available
-            exit
-        else
-            exit 1
-        fi
-        ;;
-    --which | -w)
-        # print the real path of a file in the current version's bin
-        shift || true
-        require_var "$1" filename
-        RET=0
-        while [ "$#" -gt 0 ]; do
-            FILE="$1"
-            FILEPATH="$CUR_FILENAME/bin/$FILE"
-            if [ -x "$FILEPATH" ]; then
-                realpath "$FILEPATH"
-            else
-                echo_err "$FILE does not exist."
-                RET=1
-            fi
-            shift || true
-        done
-        exit "$RET"
-        ;;
-    --help | -h)
-        expect_arg_count 1 "$#"
-        cat << EOD >&2
+cmd_help () {
+    cat << EOD >&2
 Usage:
 
   usenim
@@ -272,74 +61,333 @@ Examples:
   Show the real path of an executable in the current version:
   $ usenim --which nimsuggest
 EOD
-        exit 1
-        ;;
-    -)
-        VER="$1"
-        shift || true
-        prepare_cmdline "$@"
-        ;;
-    -*)
-        echo_err "Unknown option '$1'."
-        exit 1
-        ;;
-    '')
-        # list local versions and quit
+    exit 1
+}
+
+cmd_link () {
+    # symlink an existing directory
+    local VER="$1"
+    local DIR_RELATIVE="$2"
+    local DIR; DIR=$(realpath "$DIR_RELATIVE")
+    if [ -x "$DIR"/bin/nim ]; then
+        dir_symlink "$DIR" "$NIM_DIR/nim-$VER"
         print_available
         exit
-        ;;
-    *)
-        # version specified
-        VER="$1"
-        shift || true
-        prepare_cmdline "$@"
-        ;;
-esac
-
-set -u
-
-# look for matching local version
-FOUND_TARGET=''
-if [ "$VER" = - ]; then
-    if ! [ -h "$PREV_FILENAME" ]; then
-        echo_err 'There is no previous version to use.'
+    else
+        echo_err "$DIR does not contain a Nim installation."
         exit 1
     fi
-    FOUND_TARGET=$(readlink "$PREV_FILENAME")
-else
-    if [[ "$VER" =~ ^([0-9]+\.){0,1}[0-9]+$ ]]; then
-        # incomplete version number
-        MATCHING_VERS=$(printf '%s\n' nim-"$VER".* | sort -V)
-    elif [[ "$VER" =~ ^([0-9]+\.){2}[0-9]+$ ]]; then
-        # complete version number
-        MATCHING_VERS=$(printf '%s\n' nim-"$VER" | sort -V)
+}
+
+cmd_list () {
+    # list local versions and quit
+    print_available
+    exit
+}
+
+cmd_remove () {
+    # remove an existing version or link
+    local VER="$1"
+    local DID_DELETE=''
+    while [ "$#" -gt 0 ]; do
+        VER="$1"
+        read -r -p "Remove version $VER? [y/N] " answer
+        case "$answer" in
+            [Yy]*)
+                DID_DELETE=1
+                rm -r "$NIM_DIR/nim-$VER"
+                ;;
+        esac
+        shift || true
+    done
+    if [ -n "$DID_DELETE" ]; then
+        print_available
+        exit
     else
-        # something else
-        MATCHING_VERS=$(printf '%s\n' nim-"$VER"* | sort -V)
+        exit 1
     fi
-    for f in $MATCHING_VERS; do
+}
+
+cmd_stable () {
+    # ask Nim server for the latest stable version
+    declare -r URL='https://nim-lang.org/channels/stable'
+    echo "Querying latest stable version from $URL..." >&2
+    local VER; VER=$(curl -sS "$URL")
+    local DIR; DIR=$(find_version_dir "$VER")
+    use_version "$DIR" "$@"
+}
+
+cmd_use () {
+    # version specified
+    local DIR; DIR=$(find_version_dir "$1")
+    shift || true
+    use_version "$DIR" "$@"
+}
+
+cmd_which () {
+    # print the real path of a file in the current version's bin
+    local FILENAME="$1"
+    RET=0
+    while [ "$#" -gt 0 ]; do
+        FILE="$1"
+        FILEPATH="$NIM_DIR/$CUR_FILENAME/bin/$FILE"
+        if [ -x "$FILEPATH" ]; then
+            realpath "$FILEPATH"
+        else
+            echo_err "$FILE does not exist."
+            RET=1
+        fi
+        shift || true
+    done
+    exit "$RET"
+}
+
+HAS_CMDLINE=''
+
+# helper functions
+
+# print to stderr in red
+echo_err () {
+    tput setaf 1 >&2
+    echo -n "$@" >&2
+    tput sgr0 >&2
+    echo '' >&2
+}
+
+require_var () {
+    local VALUE="$1"
+    local LABEL="$2"
+    if [ -z "$VALUE" ]; then
+        echo_err "No $LABEL given."
+        exit 1
+    fi
+}
+
+expect_arg_count () {
+    local EXPECTED="$1"
+    local ACTUAL="$2"
+    if [ "$ACTUAL" -lt "$EXPECTED" ]; then
+        echo_err "Too few arguments."
+        exit 1
+    elif [ "$ACTUAL" -gt "$EXPECTED" ]; then
+        echo_err "Too many arguments."
+        exit 1
+    fi
+}
+
+# list local versions
+print_available () {
+    pushd "$NIM_DIR" > /dev/null
+    echo 'Installed versions:' >&2
+    local ALL_VERS; ALL_VERS=$(printf '%s\n' nim-* | sort -V)
+    local CUR_VER; CUR_VER=$(readlink "$CUR_FILENAME" || echo '')
+    for f in $ALL_VERS; do
         if [ -d "$f" ]; then
-            FOUND_TARGET="$f"
+            if [[ "$f" == "$CUR_VER" ]]; then
+                echo -n '* ' >&2
+                tput setaf 2 >&2
+            else
+                echo -n '  ' >&2
+            fi
+            echo -n "${f//nim-/}" >&2
+            tput sgr0 >&2
+            LINK_DEST=$(readlink "$f" || true)
+            if [ -n "$LINK_DEST" ]; then
+                tput dim >&2
+                echo -n ' -> ' >&2
+                tput sgr0 >&2
+                echo -n "$LINK_DEST" >&2
+            fi
+            echo '' >&2
         fi
     done
-fi
-if [ -n "$FOUND_TARGET" ]; then
-    # version found, symlink it
-    use_version "$FOUND_TARGET"
-else
-    # version not found
-    echo_err "Version $VER is not installed."
-    print_available
+    popd > /dev/null
+}
 
-    # ask if the user wants to install it
-    read -r -p 'Do you want to clone and install it? [y/N] ' answer
-    case "$answer" in
-        [Yy]*)
-            install_version "$VER"
-            use_version nim-"$VER"
+# clone and install a given version
+install_version () {
+    local VER="$1"
+    local GIT_URL='https://github.com/nim-lang/Nim'
+    pushd "$NIM_DIR" > /dev/null
+    if [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # e.g. 2.0.10
+        set -x
+        git clone "$GIT_URL" --depth 1 --branch v"$VER" nim-"$VER"
+        pushd nim-"$VER"
+    elif [[ "$VER" =~ ^#[0-9A-Za-z]+$ ]]; then
+        # e.g. #15271dba2f4772a193f027d36c05b838dfff5bd4
+        set -x
+        git clone "$GIT_URL" nim-"$VER"
+        pushd nim-"$VER"
+        git checkout "${1:1}" # omit leading '#'
+    else
+        # arbitrary branch/tag
+        set -x
+        git clone "$GIT_URL" --depth 1 --branch "$VER" nim-"$VER"
+        pushd nim-"$VER"
+    fi
+    ./build_all.sh
+    # delete unneeded stuff to save space
+    rm -rf nimcache/ csources*/
+    find . -name .git -exec rm -rf {} +
+    rm -v compiler/nim{1,2} || true
+    popd
+    popd > /dev/null
+
+    { set +x; } 2> /dev/null
+}
+
+dir_symlink () {
+    local TARGET="$1"
+    local FILENAME="$2"
+    ln -sTf "$TARGET" "$FILENAME"
+}
+
+# use a locally installed version
+use_version () {
+    local DIR="$1"
+    local HAS_CMDLINE=''
+    local CMDLINE
+
+    if [ -z "$DIR" ]; then
+        exit 1
+    fi
+
+    shift || true
+    if [ "$#" -ge 1 ]; then
+        case "$1" in
+            -x)
+                shift || true
+                if [ "$#" -lt 1 ]; then
+                    echo_err 'No command specified.'
+                    exit 1
+                fi
+                HAS_CMDLINE=1
+                CMDLINE=("$@")
+                ;;
+            *)
+                echo_err "Unexpected argument '$1'."
+                exit 1
+                ;;
+        esac
+    fi
+
+    if [ -n "$HAS_CMDLINE" ]; then
+        # command given via -x, temporarily set PATH and run command
+        local REALPATH; REALPATH=$(realpath "$NIM_DIR/$DIR")
+        export PATH="$REALPATH/bin:$PATH"
+        "${CMDLINE[@]}"
+        exit "$?"
+    else
+        # update symlink
+        if [ -h "$NIM_DIR/$CUR_FILENAME" ]; then
+            PREV_TARGET=$(readlink "$NIM_DIR/$CUR_FILENAME")
+            if [ "$PREV_TARGET" != "$DIR" ]; then
+                dir_symlink "$PREV_TARGET" "$NIM_DIR/$PREV_FILENAME"
+            fi
+        fi
+        dir_symlink "$DIR" "$NIM_DIR/$CUR_FILENAME"
+        nim --version
+    fi
+}
+
+find_version_dir () {
+    local VER="$1"
+
+    # look for matching local version
+    pushd "$NIM_DIR" > /dev/null
+    local FOUND_TARGET=''
+    local MATCHING_VERS
+    if [ "$VER" = - ]; then
+        if ! [ -h "$PREV_FILENAME" ]; then
+            echo_err 'There is no previous version to use.'
+            exit 1
+        fi
+        FOUND_TARGET=$(readlink "$PREV_FILENAME")
+    else
+        if [[ "$VER" =~ ^([0-9]+\.){0,1}[0-9]+$ ]]; then
+            # incomplete version number
+            MATCHING_VERS=$(printf '%s\n' nim-"$VER".* | sort -V)
+        elif [[ "$VER" =~ ^([0-9]+\.){2}[0-9]+$ ]]; then
+            # complete version number
+            MATCHING_VERS=$(printf '%s\n' nim-"$VER" | sort -V)
+        else
+            # something else
+            MATCHING_VERS=$(printf '%s\n' nim-"$VER"* | sort -V)
+        fi
+        for f in $MATCHING_VERS; do
+            if [ -d "$f" ]; then
+                FOUND_TARGET="$f"
+            fi
+        done
+    fi
+    popd > /dev/null
+
+    if [ -n "$FOUND_TARGET" ]; then
+        echo "$FOUND_TARGET"
+    else
+        # version not found
+        echo_err "Version $VER is not installed."
+        print_available
+
+        # ask if the user wants to install it
+        read -r -p 'Do you want to clone and install it? [y/N] ' answer
+        case "$answer" in
+            [Yy]*)
+                install_version "$VER"
+                echo "nim-$VER"
+                ;;
+        esac
+    fi
+}
+
+# main
+
+usenim_main () {
+    mkdir -pv "$NIM_DIR"
+
+    if [ "$#" -eq 0 ]; then
+        cmd_list
+    fi
+    case "$1" in
+        --stable)
+            shift || true
+            cmd_stable "$@"
             ;;
-        *)
+        --link | -l)
+            shift || true
+            # TODO unify expect_arg_count and require_var
+            expect_arg_count 2 "$#"
+            require_var "$1" version
+            require_var "$2" directory
+            cmd_link "$1" "$2"
+            ;;
+        --remove | -r)
+            shift || true
+            expect_arg_count 1 "$#"
+            require_var "$1" version
+            cmd_remove "$1"
+            ;;
+        --which | -w)
+            shift || true
+            expect_arg_count 1 "$#"
+            require_var "$1" filename
+            cmd_which "$1"
+            ;;
+        --help | -h)
+            expect_arg_count 1 "$#"
+            cmd_help
+            ;;
+        -*)
+            echo_err "Unknown option '$1'."
             exit 1
             ;;
+        *)
+            local VER="$1"
+            shift || true
+            cmd_use "$VER" "$@"
+            ;;
     esac
-fi
+}
+
+usenim_main "$@"
