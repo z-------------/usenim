@@ -154,10 +154,11 @@ echo_err () {
     echo '' >&2
 }
 
-require_var () {
-    local VALUE="$1"
+require_arg () {
+    local N="$1"
     local LABEL="$2"
-    if [ -z "$VALUE" ]; then
+    local ARGC="$3"
+    if [ "$N" -gt "$ARGC" ]; then
         echo_err "No $LABEL given."
         exit 1
     fi
@@ -356,22 +357,21 @@ usenim_main () {
             ;;
         --link | -l)
             shift || true
-            # TODO unify expect_arg_count and require_var
+            require_arg 1 version "$#"
+            require_arg 2 directory "$#"
             expect_arg_count 2 "$#"
-            require_var "$1" version
-            require_var "$2" directory
             cmd_link "$1" "$2"
             ;;
         --remove | -r)
             shift || true
+            require_arg 1 version "$#"
             expect_arg_count 1 "$#"
-            require_var "$1" version
             cmd_remove "$1"
             ;;
         --which | -w)
             shift || true
+            require_arg 1 filename "$#"
             expect_arg_count 1 "$#"
-            require_var "$1" filename
             cmd_which "$1"
             ;;
         --help | -h)
