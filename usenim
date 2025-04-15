@@ -335,7 +335,7 @@ find_version_dir () {
         read -r -p 'Do you want to clone and install it? [y/N] ' answer
         case "$answer" in
             [Yy]*)
-                install_version "$VER"
+                install_version "$VER" >&2
                 echo "nim-$VER"
                 ;;
         esac
