@@ -378,6 +378,11 @@ usenim_main () {
             expect_arg_count 1 "$#"
             cmd_help
             ;;
+        -)
+            local VER="$1"
+            shift || true
+            cmd_use "$VER" "$@"
+            ;;
         -*)
             echo_err "Unknown option '$1'."
             exit 1
